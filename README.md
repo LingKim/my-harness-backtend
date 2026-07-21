@@ -2,12 +2,22 @@
 
 本目录是 Java 21 + Spring Boot 4.1 后端，提供 Web API、MyBatis-Plus 数据访问、Flyway 数据库迁移和可选的 Spring AI OpenAI-compatible 集成。
 
+后端采用单 Maven module 的模块化单体架构。开始修改前请先阅读：
+
+- [后端 AI Coding 规则](AGENTS.md)
+- [模块化单体架构说明](docs/architecture.md)
+
+新增代码先按业务含义选择 `account`、`guide`、`assistant`、`community`、`support`、`moderation`、`notification` 或 `media` 模块，再按需放入模块内的 `api`、`application`、`domain` 或 `infrastructure`。不要建立全局 `controller/service/mapper/entity` 目录。
+
 ## 常用命令
 
 ```bash
+./mvnw -Dtest=ArchitectureRulesTests test
 ./mvnw test
 ./mvnw spring-boot:run
 ```
+
+第一条命令只运行模块与分层依赖规则；第二条命令运行包括架构规则在内的完整测试。
 
 ## 默认行为
 

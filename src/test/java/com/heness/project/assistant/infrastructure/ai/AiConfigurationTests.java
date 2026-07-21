@@ -1,4 +1,4 @@
-package com.heness.project.config.ai;
+package com.heness.project.assistant.infrastructure.ai;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.chat.model.ChatModel;
