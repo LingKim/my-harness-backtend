@@ -22,6 +22,8 @@ class HealthControllerTests {
 		mockMvc.perform(get("/api/health"))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.status").value("UP"))
-				.andExpect(jsonPath("$.service").value("heness-backend"));
+				.andExpect(jsonPath("$.service").value("heness-backend"))
+				.andExpect(jsonPath("$.code").doesNotExist())
+				.andExpect(jsonPath("$.data").doesNotExist());
 	}
 }
