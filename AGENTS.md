@@ -7,14 +7,34 @@
 处理后端任务时按以下顺序判断：
 
 1. 主仓库 `openspec/specs/` 与已经确认的活动 change。
-2. 本文件、[后端架构文档](docs/architecture.md) 和 `README.md`。
-3. 当前 `pom.xml`、源码、测试、Flyway migration 与真实命令输出。
-4. Java 21、Spring Boot 4.1、MyBatis-Plus 3.5.17、MySQL 8.4 和 Spring AI 2.0 当前文档。
-5. 通用最佳实践和代理既有知识。
+2. 主仓库 [ChinaMate 接口开发规范](../docs/standards/api-development-guidelines.md)。
+3. 本文件、[后端架构文档](docs/architecture.md) 和 `README.md`。
+4. 当前 `pom.xml`、源码、测试、Flyway migration 与真实命令输出。
+5. Java 21、Spring Boot 4.1、MyBatis-Plus 3.5.17、MySQL 8.4 和 Spring AI 2.0 当前文档。
+6. 通用最佳实践和代理既有知识。
 
 如果文档与代码、测试或当前依赖冲突，先核实变更背景；不得根据旧教程覆盖已验证的项目事实。
 
-## 2. 模块化单体边界
+## 2. 接口开发规范（强制）
+
+凡新增、修改、评审或排查 HTTP 接口，必须先完整阅读主仓库 [ChinaMate 接口开发规范](../docs/standards/api-development-guidelines.md)，并将其作为强制开发约束。适用范围包括但不限于：
+
+- URL、HTTP 方法、状态码和版本设计。
+- Request、Response、Bean Validation、PATCH 三态和字段兼容性。
+- 分页、过滤、排序、统一错误和 `ProblemDetail`。
+- 认证、授权、资源可见性、敏感信息和限流。
+- 幂等、并发控制、状态机、自定义方法和异步任务。
+- Controller、应用层、领域层、MyBatis 适配和接口测试。
+
+执行要求：
+
+1. 接口实现前，必须在对应 OpenSpec change 中明确可观察契约和验收场景；已确认的具体 OpenSpec 规格优先于通用接口规范。
+2. Controller、Request、Response、异常映射和测试必须符合接口规范，不得因个人偏好引入另一套响应包装、分页格式、错误结构或 URL 风格。
+3. 不得通过普通 PATCH 绕过状态机，不得向 API 暴露数据库行对象，也不得创建全局泛型 `BaseController` 规避业务用例建模。
+4. 需要偏离通用规范时，必须先在 OpenSpec artifacts 中说明业务理由、兼容性和验证方式；若偏离会形成项目级新规则，必须同步修改根级接口规范，经确认后才能实现。
+5. 如果独立检出后端仓库导致 `../docs/standards/api-development-guidelines.md` 不存在，涉及 HTTP 接口的设计、实现或评审不得继续；必须先从主仓库取得当前版本，禁止根据记忆或通用教程自行补全规则。
+
+## 3. 模块化单体边界
 
 项目保持一个 Maven module、一个 Spring Boot 进程和一个可执行产物。业务代码按顶层 package 定位：
 
@@ -29,7 +49,7 @@
 
 `ProjectApplication`、`config` 和 `health` 是技术入口，不是业务模块。不要建立全局 `controller/`、`service/`、`mapper/` 或 `entity/` 目录。
 
-## 3. 模块内部职责
+## 4. 模块内部职责
 
 模块内部只在出现真实类型时按需创建：
 
@@ -47,7 +67,7 @@
 5. API DTO、应用结果、领域对象和数据库行对象不得混用。
 6. 不为每个用例机械创建接口和 `Impl`；只有真实替换边界才定义接口。
 
-## 4. 跨模块协作
+## 5. 跨模块协作
 
 - 跨模块同步调用只能使用目标模块公开的 `application` 契约。
 - 禁止访问其他模块的 `api`、`domain`、`infrastructure`、Mapper 或数据库行对象。
@@ -55,7 +75,7 @@
 - 核心业务使用同步调用；通知和埋点等副作用可以在事务成功后触发，但不得自行引入消息队列。
 - 事务保持短小，外部模型、网络、文件或对象存储 I/O 不得放在数据库事务内。
 
-## 5. `shared` 准入规则
+## 6. `shared` 准入规则
 
 只有同时满足以下条件的技术能力才能进入 `shared`：
 
@@ -65,7 +85,7 @@
 
 业务对象、业务枚举、业务 DTO、Mapper、仓储、`BaseService`、`BaseController` 和无明确语义的 `Utils` 禁止进入 `shared`。首次出现的辅助代码保留在所属模块，不为未来可能复用提前抽象。
 
-## 6. 数据与外部能力
+## 7. 数据与外部能力
 
 - 数据访问只使用 MyBatis-Plus，不得引入 Spring Data JPA、JPA entity、`JpaRepository`、Criteria API 或 `@DataJpaTest`。
 - 数据库结构只由 `src/main/resources/db/migration/` 中新的 Flyway migration 管理。
@@ -74,7 +94,7 @@
 - Prompt 放在 `src/main/resources/prompts/<module>/`，不得将大段 Prompt 散落在 Controller。
 - Spring AI 和对象存储通过模块基础设施适配器接入，密钥不得写入代码、测试、文档、接口或日志。
 
-## 7. 安全与测试
+## 8. 安全与测试
 
 - 必需依赖使用构造器注入和 `private final` 字段。
 - Controller 使用 Bean Validation；异常通过统一错误契约处理。
@@ -97,7 +117,7 @@ git diff --check
 
 架构测试是静态边界门禁，不替代业务测试、数据库集成测试、安全测试或真实运行验证。修改代码后默认不运行无关 build，但必须运行与变更风险相称的测试。
 
-## 8. 文档与 Git
+## 9. 文档与 Git
 
 - 新建或修改的人类可读文档和代码注释默认使用中文；标识符、命令、路径和协议字段保留原文。
 - 新增模块或修改边界时，同步更新 `docs/architecture.md` 和架构测试。
