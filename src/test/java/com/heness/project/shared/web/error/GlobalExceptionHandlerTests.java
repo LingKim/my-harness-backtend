@@ -180,6 +180,8 @@ class GlobalExceptionHandlerTests {
 		String body = result.getResponse().getContentAsString();
 		String traceId = JsonPath.read(body, "$.traceId");
 		assertThat(output).contains("traceId=" + traceId);
+		assertThat(output).contains("exceptionType=java.lang.IllegalStateException");
+		assertThat(output).doesNotContain("sensitive-value");
 	}
 
 	@RestController

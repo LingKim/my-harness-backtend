@@ -109,12 +109,14 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 				null
 		);
 		String traceId = String.valueOf(problemDetail.getProperties().get("traceId"));
+		List<StackTraceElement> safeStackTrace = List.of(exception.getStackTrace());
 		LOGGER.error(
-				"未处理的 API 异常: method={}, path={}, traceId={}",
+				"未处理的 API 异常: method={}, path={}, traceId={}, exceptionType={}, stackTrace={}",
 				request.getMethod(),
 				request.getRequestURI(),
 				traceId,
-				exception
+				exception.getClass().getName(),
+				safeStackTrace
 		);
 		return response(problemDetail, ApiErrorCode.INTERNAL_SERVER_ERROR.status());
 	}
