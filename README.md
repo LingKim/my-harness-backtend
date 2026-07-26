@@ -4,8 +4,12 @@
 
 后端采用单 Maven module 的模块化单体架构。开始修改前请先阅读：
 
-- [后端 AI Coding 规则](AGENTS.md)
+- [后端 AI Coding 入口](AGENTS.md)
+- [后端开发约定](../.codex/rules/backend-conventions.md)（完整 AIWorkSpace）
+- [数据库开发约定](../.codex/rules/database-conventions.md)（完整 AIWorkSpace）
 - [模块化单体架构说明](docs/architecture.md)
+
+后端 Rules 与 Skills 统一位于完整 AIWorkSpace 根 `.codex/`，本 submodule 不保存局部副本。Java/Spring Boot 与 MySQL 通用方法分别位于 `../.codex/skills/java-springboot/` 和 `../.codex/skills/mysql/`；独立 clone 只包含源码和普通文档，不支持完整 AI Coding 治理。
 
 新增代码先按业务含义选择 `account`、`guide`、`assistant`、`community`、`support`、`moderation`、`notification` 或 `media` 模块，再按需放入模块内的 `api`、`application`、`domain` 或 `infrastructure`。不要建立全局 `controller/service/mapper/entity` 目录。
 

@@ -1,5 +1,7 @@
 # ChinaMate 后端模块化单体架构
 
+本文解释架构设计和示例；在完整 AIWorkSpace 中，强制开发约束以 [后端开发约定](../../.codex/rules/backend-conventions.md) 和 [数据库开发约定](../../.codex/rules/database-conventions.md) 为规范源。目录或边界变化时三者必须同步，但不得在本文或子仓库另建冲突规则。
+
 ## 1. 目标
 
 后端采用轻量模块化单体：只有一个 Maven module、一个 Spring Boot 进程、一个可执行产物和一个 MySQL 数据源，但业务代码按明确领域边界组织。
