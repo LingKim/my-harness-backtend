@@ -1,6 +1,8 @@
 spring:
   application:
     name: heness-backend
+  autoconfigure:
+    exclude: org.springframework.boot.security.autoconfigure.UserDetailsServiceAutoConfiguration
   datasource:
     url: ${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3306/heness?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false}
     username: ${SPRING_DATASOURCE_USERNAME:heness}
@@ -31,6 +33,16 @@ mybatis-plus:
 app:
   cors:
     allowed-origin: ${FRONTEND_ORIGIN:http://localhost:3000}
+  auth:
+    enabled: ${DATABASE_ENABLED:false}
+    token-pepper: ${APP_AUTH_TOKEN_PEPPER:}
+    failure-pepper: ${APP_AUTH_FAILURE_PEPPER:}
+    access-token-ttl: 30m
+    session-ttl: 7d
+    refresh-conflict-grace: 5s
+    bcrypt-cost: ${APP_AUTH_BCRYPT_COST:12}
+    cookie-secure: ${APP_AUTH_COOKIE_SECURE:true}
+    trusted-proxy-cidrs: ${APP_AUTH_TRUSTED_PROXY_CIDRS:}
   ai:
     enabled: ${AI_ENABLED:false}
     base-url: ${AI_BASE_URL:https://api.openai.com}

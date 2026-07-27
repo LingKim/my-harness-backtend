@@ -11,7 +11,7 @@ import java.util.List;
 import java.util.UUID;
 
 @Component
-final class ApiProblemDetailFactory {
+public final class ApiProblemDetailFactory {
 
 	private static final String PROBLEM_TYPE_PREFIX = "urn:chinamate:problem:";
 	private static final String TRACE_ID_KEY = "traceId";
