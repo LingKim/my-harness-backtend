@@ -46,24 +46,21 @@ if (missing.length > 0) {
   exit 1
 }
 
-for rule_id in RULE-BE-001 RULE-BE-002 RULE-BE-003 RULE-BE-004 RULE-BE-005 RULE-BE-006 RULE-BE-007 RULE-BE-008; do
+for rule_id in RULE-BE-001 RULE-BE-002 RULE-BE-003 RULE-BE-004 RULE-BE-005 RULE-BE-006 RULE-BE-007 RULE-BE-008 RULE-BE-009; do
   if ! grep -Fq "$rule_id" ../.codex/rules/backend-conventions.md; then
     echo "失败：backend-conventions.md 缺少 Rule ID：$rule_id" >&2
     exit 1
   fi
 done
 
-for rule_id in RULE-DB-001 RULE-DB-002 RULE-DB-003 RULE-DB-004 RULE-DB-005 RULE-DB-006 RULE-DB-007 RULE-DB-008; do
+for rule_id in RULE-DB-001 RULE-DB-002 RULE-DB-003 RULE-DB-004 RULE-DB-005 RULE-DB-006 RULE-DB-007 RULE-DB-008 RULE-DB-009; do
   if ! grep -Fq "$rule_id" ../.codex/rules/database-conventions.md; then
     echo "失败：database-conventions.md 缺少 Rule ID：$rule_id" >&2
     exit 1
   fi
 done
 
-java_hash="$(
-  cd ../.codex/skills/java-springboot
-  find . -type f -print0 | LC_ALL=C sort -z | xargs -0 shasum -a 256 | shasum -a 256 | awk '{print $1}'
-)"
+java_hash="$(python3 -c 'import hashlib,pathlib; p=pathlib.Path("../.codex/skills/java-springboot"); h=hashlib.sha256(); [(h.update(f.relative_to(p).as_posix().encode()),h.update(b"\0"),h.update(f.read_bytes()),h.update(b"\0")) for f in sorted(x for x in p.rglob("*") if x.is_file())]; print(h.hexdigest())')"
 mysql_hash="$(
   cd ../.codex/skills/mysql
   find . -type f -print0 | LC_ALL=C sort -z | xargs -0 shasum -a 256 | shasum -a 256 | awk '{print $1}'
@@ -73,13 +70,15 @@ node -e '
 const fs = require("fs");
 const lock = JSON.parse(fs.readFileSync("../.codex/skills-lock.json", "utf8"));
 const names = Object.keys(lock.skills ?? {}).sort();
-const java = lock.skills?.["java-springboot"];
+const projectNames = Object.keys(lock.projectSkills ?? {}).sort();
+const java = lock.projectSkills?.["java-springboot"];
 const mysql = lock.skills?.mysql;
 const valid = lock.version === 1
-  && JSON.stringify(names) === JSON.stringify(["java-springboot", "mysql", "vercel-react-best-practices"])
-  && java?.source === "github/awesome-copilot"
-  && java?.sourceType === "github"
-  && java?.skillPath === "skills/java-springboot/SKILL.md"
+  && JSON.stringify(names) === JSON.stringify(["mysql", "vercel-react-best-practices"])
+  && JSON.stringify(projectNames) === JSON.stringify(["chinamate-fullstack-delivery", "java-springboot"])
+  && java?.source === "ChinaMate project"
+  && java?.sourceType === "project"
+  && java?.skillPath === ".codex/skills/java-springboot/SKILL.md"
   && /^[0-9a-f]{64}$/.test(java?.computedHash ?? "")
   && java?.contentHash === process.argv[1]
   && mysql?.source === "planetscale/database-skills"
