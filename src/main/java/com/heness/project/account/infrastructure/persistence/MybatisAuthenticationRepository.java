@@ -4,13 +4,16 @@ import com.heness.project.account.application.AccountRecord;
 import com.heness.project.account.application.AccountView;
 import com.heness.project.account.application.AuthenticationRepository;
 import com.heness.project.account.application.DuplicateAccount;
+import com.heness.project.account.application.CurrentSessionRecord;
 import com.heness.project.account.application.RefreshTokenRecord;
 import com.heness.project.account.application.RefreshTokenStatus;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Repository;
+import org.springframework.beans.factory.annotation.Autowired;
 
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -21,14 +24,26 @@ class MybatisAuthenticationRepository implements AuthenticationRepository {
 	private final AccountMapper accountMapper;
 	private final AuthSessionMapper sessionMapper;
 	private final RefreshTokenMapper refreshTokenMapper;
+	private final AccountPreferencesMapper preferencesMapper;
+	private final TravelContextMapper travelContextMapper;
 
+	@Autowired
 	MybatisAuthenticationRepository(
 			AccountMapper accountMapper,
 			AuthSessionMapper sessionMapper,
-			RefreshTokenMapper refreshTokenMapper) {
+			RefreshTokenMapper refreshTokenMapper,
+			AccountPreferencesMapper preferencesMapper,
+			TravelContextMapper travelContextMapper) {
 		this.accountMapper = accountMapper;
 		this.sessionMapper = sessionMapper;
 		this.refreshTokenMapper = refreshTokenMapper;
+		this.preferencesMapper = preferencesMapper;
+		this.travelContextMapper = travelContextMapper;
+	}
+
+	MybatisAuthenticationRepository(AccountMapper accountMapper, AuthSessionMapper sessionMapper,
+			RefreshTokenMapper refreshTokenMapper) {
+		this(accountMapper, sessionMapper, refreshTokenMapper, null, null);
 	}
 
 	@Override
@@ -95,7 +110,8 @@ class MybatisAuthenticationRepository implements AuthenticationRepository {
 		)).map(row -> new AccountView(
 				UUID.fromString(row.publicId()),
 				row.accountName(),
-				DatabaseTimes.toInstant(row.createdAt())
+				DatabaseTimes.toInstant(row.createdAt()),
+				row.preferredLanguage()
 		));
 	}
 
@@ -153,6 +169,57 @@ class MybatisAuthenticationRepository implements AuthenticationRepository {
 		if (sessionId != null) {
 			revokeSession(sessionId, revokedAt);
 		}
+	}
+
+	@Override
+	public void initializeAccountPreferences(long accountId, Instant createdAt) {
+		AccountPreferencesRow preferences = new AccountPreferencesRow();
+		preferences.setAccountId(accountId);
+		preferences.setPreferredLanguage("zh-CN");
+		preferences.setUpdatedAt(DatabaseTimes.toDatabase(createdAt));
+		preferencesMapper.insert(preferences);
+		TravelContextRow context = new TravelContextRow();
+		context.setAccountId(accountId);
+		context.setVersion(0L);
+		context.setCreatedAt(DatabaseTimes.toDatabase(createdAt));
+		context.setUpdatedAt(DatabaseTimes.toDatabase(createdAt));
+		travelContextMapper.insert(context);
+	}
+
+	@Override
+	public Optional<AccountRecord> lockAccountByPublicId(UUID publicId) {
+		return Optional.ofNullable(accountMapper.lockByPublicId(publicId.toString())).map(this::toRecord);
+	}
+
+	@Override
+	public Optional<CurrentSessionRecord> lockActiveSession(long accountId, String accessTokenHash, Instant now) {
+		return Optional.ofNullable(sessionMapper.lockActiveSession(
+				accountId, accessTokenHash, DatabaseTimes.toDatabase(now)))
+				.map(row -> new CurrentSessionRecord(row.sessionId(), DatabaseTimes.toInstant(row.absoluteExpiresAt())));
+	}
+
+	@Override
+	public void updatePasswordAndRotateCurrentSession(
+			AccountRecord account, CurrentSessionRecord currentSession, String passwordHash,
+			String nextAccessTokenHash, String nextRefreshTokenHash, Instant nextAccessExpiresAt, Instant changedAt) {
+		LocalDateTime changed = DatabaseTimes.toDatabase(changedAt);
+		if (accountMapper.updatePasswordHash(account.internalId(), passwordHash) != 1) {
+			throw new IllegalStateException("密码摘要更新失败");
+		}
+		refreshTokenMapper.revokeForOtherSessions(account.internalId(), currentSession.sessionId());
+		sessionMapper.revokeOtherSessions(account.internalId(), currentSession.sessionId(), changed);
+		refreshTokenMapper.revokeActiveForSession(currentSession.sessionId());
+		if (sessionMapper.rotateAccess(currentSession.sessionId(), nextAccessTokenHash,
+				DatabaseTimes.toDatabase(nextAccessExpiresAt), changed) != 1) {
+			throw new IllegalStateException("当前会话轮换失败");
+		}
+		RefreshTokenRow refresh = new RefreshTokenRow();
+		refresh.setSessionId(currentSession.sessionId());
+		refresh.setTokenHash(nextRefreshTokenHash);
+		refresh.setStatus("ACTIVE");
+		refresh.setCreatedAt(changed);
+		refresh.setExpiresAt(DatabaseTimes.toDatabase(currentSession.absoluteExpiresAt()));
+		refreshTokenMapper.insert(refresh);
 	}
 
 	private AccountRecord toRecord(AccountRow row) {

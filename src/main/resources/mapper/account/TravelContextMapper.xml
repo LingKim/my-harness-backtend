@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.heness.project.account.infrastructure.persistence.TravelContextMapper">
+    <select id="findByPublicAccountId" resultType="com.heness.project.account.infrastructure.persistence.TravelContextRow">
+        SELECT t.account_id, t.country_or_region, t.city, t.trip_start_date, t.trip_end_date,
+               t.assistance_needs, t.version, t.created_at, t.updated_at
+        FROM account_travel_context t JOIN account a ON a.id = t.account_id
+        WHERE a.public_id = #{publicId}
+    </select>
+    <update id="replaceIfVersionMatches">
+        UPDATE account_travel_context
+        SET country_or_region = #{countryOrRegion}, city = #{city}, trip_start_date = #{tripStartDate},
+            trip_end_date = #{tripEndDate}, assistance_needs = #{assistanceNeeds},
+            version = version + 1, updated_at = #{updatedAt}
+        WHERE account_id = #{accountId} AND version = #{expectedVersion}
+    </update>
+    <update id="clearIfVersionMatches">
+        UPDATE account_travel_context
+        SET country_or_region = NULL, city = NULL, trip_start_date = NULL, trip_end_date = NULL,
+            assistance_needs = NULL, version = version + 1, updated_at = #{updatedAt}
+        WHERE account_id = #{accountId} AND version = #{expectedVersion}
+    </update>
+    <select id="lockCurrentVersion" resultType="java.lang.Long">
+        SELECT version FROM account_travel_context WHERE account_id = #{accountId} FOR UPDATE
+    </select>
+</mapper>

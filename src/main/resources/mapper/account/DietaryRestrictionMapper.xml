@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.heness.project.account.infrastructure.persistence.DietaryRestrictionMapper">
+    <select id="findOrdered" resultType="com.heness.project.account.infrastructure.persistence.DietaryRestrictionRow">
+        SELECT id, account_id, position, restriction_text, normalized_text
+        FROM account_dietary_restriction WHERE account_id = #{accountId} ORDER BY position
+    </select>
+    <delete id="deleteForAccount">
+        DELETE FROM account_dietary_restriction WHERE account_id = #{accountId}
+    </delete>
+</mapper>

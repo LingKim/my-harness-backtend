@@ -12,7 +12,7 @@ public record AccountRecord(
 		Instant createdAt) {
 
 	public AccountView toView() {
-		return new AccountView(publicId, accountName, createdAt);
+		return new AccountView(publicId, accountName, createdAt, "zh-CN");
 	}
 
 	@Override

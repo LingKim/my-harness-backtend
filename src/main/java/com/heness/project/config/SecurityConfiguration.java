@@ -36,13 +36,13 @@ public class SecurityConfiguration {
 					response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
 					response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
 					response.getWriter().write("""
-							{"type":"urn:chinamate:problem:access-token-invalid","title":"需要登录","status":401,"detail":"当前登录状态无效或已过期","code":"ACCESS_TOKEN_INVALID","traceId":"%s"}
+							{"type":"urn:chinamate:problem:authentication-required","title":"需要登录","status":401,"detail":"当前登录状态无效或已过期","code":"AUTHENTICATION_REQUIRED","traceId":"%s"}
 							""".formatted(UUID.randomUUID()));
 				}));
 
 		if (authEnabled) {
 			http.authorizeHttpRequests(authorize -> authorize
-					.requestMatchers(HttpMethod.GET, "/api/v1/accounts/me").authenticated()
+					.requestMatchers("/api/v1/accounts/me", "/api/v1/accounts/me/**", "/api/v1/accounts/me:change-password").authenticated()
 					.anyRequest().permitAll());
 			AuthCsrfFilter csrfFilter = csrfFilterProvider.getIfAvailable();
 			AccessTokenAuthenticationFilter accessFilter = accessFilterProvider.getIfAvailable();

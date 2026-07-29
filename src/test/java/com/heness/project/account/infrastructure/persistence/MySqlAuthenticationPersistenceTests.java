@@ -1,6 +1,8 @@
 package com.heness.project.account.infrastructure.persistence;
 
 import com.heness.project.account.application.RefreshTokenRecord;
+import com.heness.project.account.application.AccountAuthenticationService;
+import com.heness.project.account.application.IssuedAuthentication;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
@@ -59,9 +61,21 @@ class MySqlAuthenticationPersistenceTests {
 	@Autowired
 	private DataSource dataSource;
 
+	@Autowired
+	private AccountAuthenticationService authentication;
+
+	@Autowired
+	private AccountPreferencesMapper preferencesMapper;
+
+	@Autowired
+	private TravelContextMapper travelContextMapper;
+
+	@Autowired
+	private MybatisAuthenticationRepository authenticationRepository;
+
 	@Test
-	void flywayCreatesAllAuthenticationTablesAtVersionTwo() throws Exception {
-		assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("2");
+	void flywayKeepsAuthenticationTablesAtCurrentVersion() throws Exception {
+		assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("3");
 
 		Set<String> tables = new HashSet<>();
 		try (var connection = dataSource.getConnection()) {
@@ -89,6 +103,45 @@ class MySqlAuthenticationPersistenceTests {
 
 		assertThatThrownBy(() -> accountMapper.insert(account("china_travel", normalizedName)))
 				.isInstanceOf(DuplicateKeyException.class);
+	}
+
+	@Test
+	@Transactional
+	void registrationTransactionCreatesDefaultPreferencesAndEmptyTravelContext() {
+		String accountName = uniqueAccountName();
+		IssuedAuthentication issued = authentication.register(
+				accountName, "Travel2026!", "Travel2026!", true);
+
+		AccountAccessProjection preferences = preferencesMapper.findAccountView(
+				issued.account().accountId().toString());
+		TravelContextRow context = travelContextMapper.findByPublicAccountId(
+				issued.account().accountId().toString());
+		assertThat(preferences.preferredLanguage()).isEqualTo("zh-CN");
+		assertThat(context.getVersion()).isZero();
+		assertThat(context.getCountryOrRegion()).isNull();
+		assertThat(context.getCity()).isNull();
+		assertThat(context.getTripStartDate()).isNull();
+		assertThat(context.getTripEndDate()).isNull();
+		assertThat(context.getAssistanceNeeds()).isNull();
+	}
+
+	@Test
+	void registrationInitializationFailureRollsBackAccountAndDefaultRowsTogether() {
+		String accountName = uniqueAccountName();
+		String normalizedName = accountName.toLowerCase();
+		UUID publicId = UUID.randomUUID();
+		TransactionTemplate transaction = new TransactionTemplate(transactionManager);
+
+		assertThatThrownBy(() -> transaction.executeWithoutResult(status -> {
+			var account = authenticationRepository.createAccount(publicId, accountName, normalizedName,
+					"$2a$12$integration-fixture-password-hash-placeholder-value", NOW);
+			authenticationRepository.initializeAccountPreferences(account.internalId(), NOW);
+			authenticationRepository.initializeAccountPreferences(account.internalId(), NOW);
+		})).isInstanceOf(DuplicateKeyException.class);
+
+		assertThat(accountMapper.findByNormalizedName(normalizedName)).isNull();
+		assertThat(preferencesMapper.findAccountView(publicId.toString())).isNull();
+		assertThat(travelContextMapper.findByPublicAccountId(publicId.toString())).isNull();
 	}
 
 	@Test

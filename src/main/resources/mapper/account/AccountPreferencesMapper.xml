@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.heness.project.account.infrastructure.persistence.AccountPreferencesMapper">
+    <update id="updateLanguage">
+        UPDATE account_preferences SET preferred_language = #{language}, updated_at = #{updatedAt}
+        WHERE account_id = (SELECT id FROM account WHERE public_id = #{publicId})
+    </update>
+    <select id="findAccountView" resultType="com.heness.project.account.infrastructure.persistence.AccountAccessProjection">
+        SELECT a.public_id, a.account_name, a.created_at, p.preferred_language
+        FROM account a JOIN account_preferences p ON p.account_id = a.id
+        WHERE a.public_id = #{publicId}
+    </select>
+</mapper>

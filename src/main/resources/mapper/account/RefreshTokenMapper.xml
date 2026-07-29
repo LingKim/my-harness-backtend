@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.heness.project.account.infrastructure.persistence.RefreshTokenMapper">
+    <select id="lockByHash" resultType="com.heness.project.account.infrastructure.persistence.RefreshTokenProjection">
+        SELECT r.id AS token_id, r.session_id, r.status, r.rotated_at, r.expires_at, s.absolute_expires_at
+        FROM account_refresh_token r JOIN account_auth_session s ON s.id = r.session_id
+        WHERE r.token_hash = #{refreshHash} FOR UPDATE
+    </select>
+    <update id="markRotated">
+        UPDATE account_refresh_token SET status = 'ROTATED', rotated_at = #{rotatedAt}
+        WHERE id = #{tokenId} AND status = 'ACTIVE'
+    </update>
+    <update id="revokeActiveForSession">
+        UPDATE account_refresh_token SET status = 'REVOKED'
+        WHERE session_id = #{sessionId} AND status = 'ACTIVE'
+    </update>
+    <update id="revokeForOtherSessions">
+        UPDATE account_refresh_token r
+        JOIN account_auth_session s ON s.id = r.session_id
+        SET r.status = 'REVOKED'
+        WHERE s.account_id = #{accountId} AND s.id != #{currentSessionId} AND r.status = 'ACTIVE'
+    </update>
+</mapper>

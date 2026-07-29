@@ -3,6 +3,7 @@ package com.heness.project.account.api;
 import com.heness.project.account.application.AuthFailure;
 import com.heness.project.account.application.AuthFailureReason;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -14,10 +15,13 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import java.net.URI;
 import java.time.Duration;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @RestControllerAdvice(basePackages = "com.heness.project.account.api")
 @ConditionalOnProperty(name = "app.auth.enabled", havingValue = "true")
 final class AccountAuthExceptionHandler {
+	private static final Logger LOGGER = LoggerFactory.getLogger(AccountAuthExceptionHandler.class);
 
 	private final AuthCookieWriter cookies;
 
@@ -26,13 +30,15 @@ final class AccountAuthExceptionHandler {
 	}
 
 	@ExceptionHandler(AuthFailure.class)
-	ResponseEntity<ProblemDetail> handle(AuthFailure failure, HttpServletResponse response) {
+	ResponseEntity<ProblemDetail> handle(AuthFailure failure, HttpServletResponse response, HttpServletRequest request) {
 		ErrorContract contract = contract(failure.reason());
 		ProblemDetail problem = ProblemDetail.forStatusAndDetail(contract.status(), contract.detail());
 		problem.setType(URI.create("urn:chinamate:problem:" + contract.typeSlug()));
 		problem.setTitle(contract.title());
 		problem.setProperty("code", failure.reason().name());
 		problem.setProperty("traceId", UUID.randomUUID().toString());
+		LOGGER.warn("账号认证请求失败: method={}, path={}, traceId={}, code={}", request.getMethod(),
+				request.getRequestURI(), problem.getProperties().get("traceId"), failure.reason().name());
 
 		ResponseEntity.BodyBuilder builder = ResponseEntity.status(contract.status())
 				.contentType(org.springframework.http.MediaType.APPLICATION_PROBLEM_JSON);
@@ -66,6 +72,8 @@ final class AccountAuthExceptionHandler {
 					HttpStatus.UNAUTHORIZED, "refresh-token-invalid", "需要重新登录", "当前会话已失效");
 			case REFRESH_CONFLICT -> new ErrorContract(
 					HttpStatus.CONFLICT, "auth-refresh-conflict", "会话正在刷新", "请使用最新会话重试");
+			case PASSWORD_CHANGE_REJECTED -> new ErrorContract(
+					HttpStatus.BAD_REQUEST, "password-change-rejected", "无法修改密码", "无法修改密码，请检查后重试");
 		};
 	}
 

@@ -71,6 +71,7 @@ public class AccountAuthenticationService {
 		} catch (DuplicateAccount duplicate) {
 			throw AuthFailure.of(AuthFailureReason.REGISTRATION_REJECTED);
 		}
+		repository.initializeAccountPreferences(account.internalId(), now);
 		return createSession(account, now);
 	}
 
@@ -117,8 +118,10 @@ public class AccountAuthenticationService {
 			repository.revokeSession(current.sessionId(), now);
 			throw AuthFailure.of(AuthFailureReason.REFRESH_TOKEN_INVALID);
 		}
-		if (current.status() != RefreshTokenStatus.ACTIVE
-				|| !now.isBefore(current.expiresAt())
+		if (current.status() != RefreshTokenStatus.ACTIVE) {
+			throw AuthFailure.of(AuthFailureReason.REFRESH_TOKEN_INVALID);
+		}
+		if (!now.isBefore(current.expiresAt())
 				|| !now.isBefore(current.absoluteExpiresAt())) {
 			repository.revokeSession(current.sessionId(), now);
 			throw AuthFailure.of(AuthFailureReason.REFRESH_TOKEN_INVALID);
@@ -162,6 +165,46 @@ public class AccountAuthenticationService {
 		}
 		return repository.findAccountByActiveAccessToken(tokenService.digest(rawAccessToken), clock.instant())
 				.orElseThrow(() -> AuthFailure.of(AuthFailureReason.ACCESS_TOKEN_INVALID));
+	}
+
+	@Transactional
+	public ChangedPasswordAuthentication changePassword(
+			UUID accountId,
+			String rawAccessToken,
+			String currentPassword,
+			String newPassword,
+			String confirmNewPassword) {
+		AccountRecord account = repository.lockAccountByPublicId(accountId)
+				.orElseThrow(() -> AuthFailure.of(AuthFailureReason.PASSWORD_CHANGE_REJECTED));
+		boolean currentMatches = currentPassword != null
+				&& passwordService.matchesOrDummy(currentPassword, account.passwordHash());
+		boolean newMatchesCurrent = newPassword != null
+				&& passwordService.matchesOrDummy(newPassword, account.passwordHash());
+		boolean accepted = currentMatches
+				&& PasswordPolicy.isValid(newPassword)
+				&& newPassword != null
+				&& newPassword.equals(confirmNewPassword)
+				&& !newMatchesCurrent;
+		if (!accepted || rawAccessToken == null || rawAccessToken.isBlank()) {
+			throw AuthFailure.of(AuthFailureReason.PASSWORD_CHANGE_REJECTED);
+		}
+
+		Instant now = clock.instant();
+		CurrentSessionRecord session = repository.lockActiveSession(
+				account.internalId(), tokenService.digest(rawAccessToken), now)
+				.orElseThrow(() -> AuthFailure.of(AuthFailureReason.PASSWORD_CHANGE_REJECTED));
+		SecretToken access = tokenService.issue();
+		SecretToken refresh = tokenService.issue();
+		SecretToken csrf = tokenService.issue();
+		Instant accessExpiresAt = now.plus(Duration.ofMinutes(30));
+		if (accessExpiresAt.isAfter(session.absoluteExpiresAt())) {
+			accessExpiresAt = session.absoluteExpiresAt();
+		}
+		repository.updatePasswordAndRotateCurrentSession(
+				account, session, passwordService.encode(newPassword), access.digest(), refresh.digest(), accessExpiresAt, now);
+		IssuedAuthentication issued = new IssuedAuthentication(
+				account.toView(), access, refresh, accessExpiresAt, session.absoluteExpiresAt());
+		return new ChangedPasswordAuthentication(issued, csrf);
 	}
 
 	private IssuedAuthentication createSession(AccountRecord account, Instant now) {

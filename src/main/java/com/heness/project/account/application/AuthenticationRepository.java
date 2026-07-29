@@ -38,4 +38,19 @@ public interface AuthenticationRepository {
 	void revokeSession(long sessionId, Instant revokedAt);
 
 	void revokeByTokenDigests(String accessTokenHash, String refreshTokenHash, Instant revokedAt);
+
+	void initializeAccountPreferences(long accountId, Instant createdAt);
+
+	Optional<AccountRecord> lockAccountByPublicId(UUID publicId);
+
+	Optional<CurrentSessionRecord> lockActiveSession(long accountId, String accessTokenHash, Instant now);
+
+	void updatePasswordAndRotateCurrentSession(
+			AccountRecord account,
+			CurrentSessionRecord currentSession,
+			String passwordHash,
+			String nextAccessTokenHash,
+			String nextRefreshTokenHash,
+			Instant nextAccessExpiresAt,
+			Instant changedAt);
 }

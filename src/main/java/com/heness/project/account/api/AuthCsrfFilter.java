@@ -26,7 +26,10 @@ public final class AuthCsrfFilter extends OncePerRequestFilter {
 			"/api/v1/accounts",
 			"/api/v1/auth-sessions",
 			"/api/v1/auth-sessions:refresh",
-			"/api/v1/auth-sessions/current"
+			"/api/v1/auth-sessions/current",
+			"/api/v1/accounts/me",
+			"/api/v1/accounts/me/travel-context",
+			"/api/v1/accounts/me:change-password"
 	);
 
 	private final String allowedOrigin;
@@ -76,7 +79,7 @@ public final class AuthCsrfFilter extends OncePerRequestFilter {
 		response.setStatus(HttpServletResponse.SC_FORBIDDEN);
 		response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
 		response.getWriter().write("""
-				{"type":"urn:chinamate:problem:csrf-invalid","title":"请求安全校验失败","status":403,"detail":"请刷新页面后重试","code":"CSRF_INVALID","traceId":"%s"}
+				{"type":"urn:chinamate:problem:access-denied","title":"请求安全校验失败","status":403,"detail":"请刷新页面后重试","code":"ACCESS_DENIED","traceId":"%s"}
 				""".formatted(UUID.randomUUID()));
 	}
 }

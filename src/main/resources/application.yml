@@ -1,6 +1,9 @@
 spring:
   application:
     name: heness-backend
+  jackson:
+    deserialization:
+      fail-on-unknown-properties: true
   autoconfigure:
     exclude: org.springframework.boot.security.autoconfigure.UserDetailsServiceAutoConfiguration
   datasource:

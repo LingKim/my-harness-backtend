@@ -10,6 +10,7 @@ import org.springframework.stereotype.Component;
 
 import java.time.Clock;
 import java.time.Duration;
+import java.time.Instant;
 
 @Component
 @ConditionalOnProperty(name = "app.auth.enabled", havingValue = "true")
@@ -35,14 +36,22 @@ final class AuthCookieWriter {
 	}
 
 	void writeCsrf(HttpServletResponse response, String token) {
+		writeCsrf(response, token, clock.instant().plus(properties.sessionTtl()));
+	}
+
+	void writeCsrf(HttpServletResponse response, String token, Instant absoluteExpiresAt) {
 		ResponseCookie cookie = ResponseCookie.from(AuthCookies.CSRF, token)
 				.secure(properties.cookieSecure())
 				.httpOnly(false)
 				.sameSite("Lax")
 				.path("/")
-				.maxAge(properties.sessionTtl())
+				.maxAge(nonNegative(Duration.between(clock.instant(), absoluteExpiresAt)))
 				.build();
 		add(response, cookie);
+	}
+
+	private Duration nonNegative(Duration duration) {
+		return duration.isNegative() ? Duration.ZERO : duration;
 	}
 
 	void clear(HttpServletResponse response) {

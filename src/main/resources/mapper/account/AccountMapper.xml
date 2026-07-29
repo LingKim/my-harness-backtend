@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.heness.project.account.infrastructure.persistence.AccountMapper">
+    <select id="findByNormalizedName" resultType="com.heness.project.account.infrastructure.persistence.AccountRow">
+        SELECT id, public_id, account_name, normalized_account_name, password_hash, created_at
+        FROM account
+        WHERE normalized_account_name = #{normalizedName}
+    </select>
+    <select id="lockByPublicId" resultType="com.heness.project.account.infrastructure.persistence.AccountRow">
+        SELECT id, public_id, account_name, normalized_account_name, password_hash, created_at
+        FROM account
+        WHERE public_id = #{publicId}
+        FOR UPDATE
+    </select>
+    <update id="updatePasswordHash">
+        UPDATE account SET password_hash = #{passwordHash} WHERE id = #{accountId}
+    </update>
+</mapper>

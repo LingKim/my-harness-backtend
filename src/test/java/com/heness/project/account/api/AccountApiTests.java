@@ -118,7 +118,7 @@ class AccountApiTests {
 					.contentType(MediaType.APPLICATION_JSON)
 					.content("{\"accountName\":\"China_2026\",\"password\":\"Password123\"}"))
 				.andExpect(status().isForbidden())
-				.andExpect(jsonPath("$.code").value("CSRF_INVALID"));
+				.andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
 	}
 
 	@Test

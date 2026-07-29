@@ -108,6 +108,48 @@ class AccountAuthenticationServiceTests {
 		assertThat(repository.revoked).isTrue();
 	}
 
+	@Test
+	void 已撤销长Token被拒绝但不再次撤销已轮换会话() {
+		FakeRepository repository = new FakeRepository();
+		repository.refresh = new RefreshTokenRecord(
+				7L, 9L, RefreshTokenStatus.REVOKED, NOW.minusSeconds(1), NOW.plusSeconds(30), NOW.plusSeconds(30));
+		AccountAuthenticationService service = service(repository, new FakeFailureStore(), NOW);
+
+		assertThatThrownBy(() -> service.refresh("refresh-cookie"))
+				.isInstanceOfSatisfying(AuthFailure.class,
+						failure -> assertThat(failure.reason()).isEqualTo(AuthFailureReason.REFRESH_TOKEN_INVALID));
+		assertThat(repository.revoked).isFalse();
+	}
+
+	@Test
+	void 修改密码轮换当前三类凭据并保持原绝对期限() {
+		FakeRepository repository = new FakeRepository();
+		repository.foundAccount = ACCOUNT;
+		AccountAuthenticationService service = service(repository, new FakeFailureStore(), NOW);
+
+		ChangedPasswordAuthentication changed = service.changePassword(
+				ACCOUNT.publicId(), "old-access", "Password123", "NewPassword456", "NewPassword456");
+
+		assertThat(repository.rotated).isTrue();
+		assertThat(changed.authentication().accessToken().rawValue()).isNotEqualTo("old-access");
+		assertThat(changed.csrfToken().rawValue()).isNotBlank();
+		assertThat(changed.authentication().absoluteExpiresAt()).isEqualTo(NOW.plus(Duration.ofDays(6)));
+		assertThat(changed.toString()).doesNotContain("Password123", "NewPassword456", "raw-");
+	}
+
+	@Test
+	void 修改密码的当前密码错误和新密码非法使用同一公开拒绝() {
+		FakeRepository repository = new FakeRepository();
+		repository.foundAccount = ACCOUNT;
+		AccountAuthenticationService service = service(repository, new FakeFailureStore(), NOW);
+
+		assertThatThrownBy(() -> service.changePassword(
+				ACCOUNT.publicId(), "old-access", "wrong", "short", "different"))
+				.isInstanceOfSatisfying(AuthFailure.class, failure ->
+						assertThat(failure.reason()).isEqualTo(AuthFailureReason.PASSWORD_CHANGE_REJECTED));
+		assertThat(repository.rotated).isFalse();
+	}
+
 	private AccountAuthenticationService service(
 			FakeRepository repository,
 			FakeFailureStore failures,
@@ -133,7 +175,8 @@ class AccountAuthenticationServiceTests {
 	}
 
 	private static final class FakeTokenService implements TokenService {
-		private final Queue<String> names = new ArrayDeque<>(java.util.List.of("access", "refresh"));
+		private final Queue<String> names = new ArrayDeque<>(java.util.List.of(
+				"access", "refresh", "csrf", "access-2", "refresh-2", "csrf-2"));
 		@Override public SecretToken issue() {
 			String name = names.remove();
 			return new SecretToken("raw-" + name, "digest-" + name);
@@ -191,5 +234,13 @@ class AccountAuthenticationServiceTests {
 		}
 		@Override public void revokeSession(long sessionId, Instant revokedAt) { revoked = true; }
 		@Override public void revokeByTokenDigests(String accessHash, String refreshHash, Instant revokedAt) { revoked = true; }
+		@Override public void initializeAccountPreferences(long accountId, Instant createdAt) { }
+		@Override public Optional<AccountRecord> lockAccountByPublicId(UUID publicId) { return Optional.ofNullable(foundAccount); }
+		@Override public Optional<CurrentSessionRecord> lockActiveSession(long accountId, String accessHash, Instant now) {
+			return Optional.of(new CurrentSessionRecord(9L, now.plus(Duration.ofDays(6))));
+		}
+		@Override public void updatePasswordAndRotateCurrentSession(AccountRecord account,
+				CurrentSessionRecord currentSession, String passwordHash, String nextAccessTokenHash,
+				String nextRefreshTokenHash, Instant nextAccessExpiresAt, Instant changedAt) { rotated = true; }
 	}
 }
